@@ -2,466 +2,424 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="google" content="notranslate">
-    <title>PDF Viewer | Digital Theological Library</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+    <title>Digital Theological Library — Reader</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+
+    <!-- PDF.js Core Library (rendering only, no viewer UI) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
     <style>
-        /* ============================================
-           BASE STYLES
-           ============================================ */
+        @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+        :root {
+            --dtl-blue: #154889;
+            --dtl-blue-hover: #123F79;
+            --dtl-blue-light: #1a5ba6;
+            --dtl-red: #AF161C;
+            --dtl-red-hover: #961318;
+            --text-primary: #1f2937;
+            --text-muted: #6b7280;
+            --text-light: #9ca3af;
+            --bg-main: #e8e8e8;
+            --bg-toolbar: #1a1a2e;
+            --bg-toolbar-hover: rgba(255,255,255,0.1);
+            --page-shadow: 0 2px 16px rgba(0,0,0,0.15);
+            --toolbar-height: 52px;
+        }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        
+
         html, body {
             height: 100%;
             overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #525659;
-            color: #fff;
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-main);
             -webkit-user-select: none;
             user-select: none;
         }
 
-        /* ============================================
-           TOOLBAR
-           ============================================ */
+        /* ===== TOOLBAR ===== */
         #toolbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--toolbar-height);
+            background: var(--bg-toolbar);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            height: 48px;
-            background: #2d2d2d;
-            border-bottom: 1px solid #1a1a1a;
-            padding: 0 12px;
-            z-index: 100;
-            position: relative;
+            padding: 0 16px;
+            z-index: 10000;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3);
         }
 
-        #toolbar-left {
+        .toolbar-section {
             display: flex;
             align-items: center;
             gap: 8px;
-            min-width: 0;
-            flex: 1;
         }
 
-        #chapter-name {
-            font-size: 14px;
-            font-weight: 600;
-            color: #e0e0e0;
+        .toolbar-center {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #chapterName {
+            color: rgba(255,255,255,0.7);
+            font-size: 13px;
+            font-weight: 500;
+            max-width: 300px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        #toolbar-center {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-shrink: 0;
-        }
-
-        #toolbar-right {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            flex-shrink: 0;
-        }
-
         .toolbar-btn {
             background: transparent;
-            border: 1px solid transparent;
-            color: #ccc;
+            border: 1px solid rgba(255,255,255,0.15);
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
             cursor: pointer;
-            padding: 6px 10px;
-            border-radius: 4px;
-            font-size: 14px;
             display: flex;
             align-items: center;
-            gap: 4px;
-            transition: background 0.15s, color 0.15s;
+            justify-content: center;
+            transition: all 0.15s ease;
+            font-size: 16px;
         }
 
         .toolbar-btn:hover {
-            background: rgba(255,255,255,0.1);
-            color: #fff;
+            background: var(--bg-toolbar-hover);
+            border-color: rgba(255,255,255,0.3);
         }
 
-        .toolbar-btn:active {
-            background: rgba(255,255,255,0.15);
-        }
+        .toolbar-btn:active { transform: scale(0.95); }
 
         .toolbar-btn:disabled {
-            opacity: 0.4;
+            opacity: 0.3;
             cursor: default;
         }
 
         .toolbar-btn:disabled:hover {
             background: transparent;
-            color: #ccc;
+            border-color: rgba(255,255,255,0.15);
         }
 
-        .toolbar-separator {
+        .page-info {
+            color: rgba(255,255,255,0.85);
+            font-size: 13px;
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .zoom-display {
+            color: rgba(255,255,255,0.6);
+            font-size: 12px;
+            font-weight: 500;
+            min-width: 45px;
+            text-align: center;
+        }
+
+        .toolbar-divider {
             width: 1px;
             height: 24px;
-            background: #555;
+            background: rgba(255,255,255,0.12);
             margin: 0 4px;
         }
 
-        #page-indicator {
-            font-size: 13px;
-            color: #bbb;
-            white-space: nowrap;
+        #dtlBrand {
+            color: rgba(255,255,255,0.5);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
 
-        #page-input {
-            width: 44px;
-            background: #3d3d3d;
-            border: 1px solid #555;
-            color: #eee;
-            font-size: 13px;
-            text-align: center;
-            padding: 3px 4px;
-            border-radius: 3px;
-            -moz-appearance: textfield;
-        }
-
-        #page-input::-webkit-outer-spin-button,
-        #page-input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-
-        #page-input:focus {
-            outline: none;
-            border-color: #7aafff;
-        }
-
-        #zoom-select {
-            background: #3d3d3d;
-            border: 1px solid #555;
-            color: #eee;
-            font-size: 13px;
-            padding: 3px 6px;
-            border-radius: 3px;
-            cursor: pointer;
-        }
-
-        #zoom-select:focus {
-            outline: none;
-            border-color: #7aafff;
-        }
-
-        /* ============================================
-           PAGE CONTAINER
-           ============================================ */
-        #viewer-container {
-            height: calc(100% - 48px);
+        /* ===== PAGE CONTAINER ===== */
+        #pageContainer {
+            position: fixed;
+            top: var(--toolbar-height);
+            left: 0;
+            right: 0;
+            bottom: 0;
             overflow-y: auto;
             overflow-x: auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 16px 0;
+            padding: 24px 0;
             scroll-behavior: auto;
         }
 
         .page-wrapper {
-            position: relative;
+            display: flex;
+            justify-content: center;
             margin-bottom: 12px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
-            background: #fff;
-            flex-shrink: 0;
         }
 
-        .page-wrapper canvas {
-            display: block;
+        .page-slot {
+            background: white;
+            box-shadow: var(--page-shadow);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
+        .page-slot canvas { display: block; }
+
+        /* Loading spinner */
         .page-loading {
             position: absolute;
             inset: 0;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: #fff;
-            color: #999;
-            font-size: 14px;
+            gap: 12px;
+            background: white;
         }
 
-        .page-loading .spinner {
-            width: 28px;
-            height: 28px;
-            border: 3px solid #e0e0e0;
-            border-top-color: #154889;
+        .page-loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e5e7eb;
+            border-top-color: var(--dtl-blue);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .page-loading-text {
+            color: var(--text-light);
+            font-size: 12px;
         }
 
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Page error state */
         .page-error {
             position: absolute;
             inset: 0;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #fff;
-            color: #cc0000;
-            font-size: 14px;
-            padding: 20px;
-            text-align: center;
-        }
-
-        /* ============================================
-           LOADING OVERLAY (initial load)
-           ============================================ */
-        #loading-overlay {
-            position: fixed;
-            inset: 0;
-            background: #525659;
-            display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 500;
-            gap: 16px;
+            gap: 8px;
+            background: white;
+            color: var(--text-muted);
+            font-size: 13px;
         }
 
-        #loading-overlay .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #666;
-            border-top-color: #fff;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+        .page-error-icon { font-size: 32px; }
+
+        .page-error-retry {
+            margin-top: 4px;
+            padding: 6px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: white;
+            color: var(--text-primary);
+            font-size: 12px;
+            cursor: pointer;
         }
 
-        #loading-overlay .text {
-            color: #ccc;
-            font-size: 14px;
+        .page-error-retry:hover { background: #f9fafb; }
+
+        /* ===== OVERLAYS ===== */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2147483647;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
         }
 
-        /* ============================================
-           END OF CHAPTER CARD
-           ============================================ */
-        .chapter-boundary-card {
-            background: #fff;
-            border-radius: 12px;
-            padding: 32px 24px;
+        .overlay-card {
+            background: white;
+            max-width: 460px;
+            width: 100%;
+            border-radius: 16px;
+            padding: 38px 30px;
             text-align: center;
-            max-width: 420px;
-            width: 90%;
-            margin: 20px auto;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.3);
-            flex-shrink: 0;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
 
-        .chapter-boundary-card .card-icon {
-            font-size: 40px;
-            margin-bottom: 12px;
+        .overlay-icon { font-size: 52px; margin-bottom: 14px; }
+
+        .overlay-title {
+            font-family: 'Source Serif 4', Georgia, serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
         }
 
-        .chapter-boundary-card h2 {
-            color: #1f2937;
-            font-size: 20px;
-            margin-bottom: 8px;
-        }
-
-        .chapter-boundary-card p {
-            color: #6b7280;
-            font-size: 14px;
+        .overlay-message {
+            color: var(--text-muted);
             line-height: 1.6;
-            margin-bottom: 16px;
+            margin-bottom: 18px;
+            font-size: 14px;
         }
 
-        .chapter-boundary-card .catalog-links {
+        .overlay-btn {
+            display: block;
+            width: 100%;
+            padding: 14px 18px;
+            border: 0;
+            border-radius: 10px;
+            color: white;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+            text-decoration: none;
+            text-align: center;
+            margin-bottom: 10px;
+            font-family: inherit;
+        }
+
+        .overlay-btn:hover { opacity: 0.9; }
+        .btn-blue { background: var(--dtl-blue); }
+        .btn-red { background: var(--dtl-red); }
+
+        .overlay-hint {
+            color: var(--text-light);
+            font-size: 12px;
+            line-height: 1.5;
+            margin-top: 4px;
+        }
+
+        .catalog-links {
             display: flex;
             flex-direction: column;
             gap: 10px;
+            margin-top: 6px;
         }
 
-        .chapter-boundary-card .catalog-link {
+        .catalog-link {
             display: block;
-            padding: 12px 16px;
-            border-radius: 8px;
+            padding: 14px 18px;
+            border-radius: 10px;
             color: white;
             text-decoration: none;
             font-weight: 700;
+            text-align: center;
+        }
+
+        /* ===== END OF CHAPTER CARD ===== */
+        .end-card-wrapper {
+            display: flex;
+            justify-content: center;
+            margin: 24px 0 48px 0;
+        }
+
+        .end-card {
+            background: white;
+            border-radius: 16px;
+            padding: 36px 32px;
+            text-align: center;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: var(--page-shadow);
+        }
+
+        .end-card-icon { font-size: 40px; margin-bottom: 12px; }
+
+        .end-card-title {
+            font-family: 'Source Serif 4', Georgia, serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .end-card-message {
+            color: var(--text-muted);
             font-size: 14px;
-            transition: opacity 0.15s;
+            line-height: 1.6;
+            margin-bottom: 20px;
         }
 
-        .chapter-boundary-card .catalog-link:hover {
-            opacity: 0.9;
+        .end-card-links {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
         }
 
-        .catalog-link-dtl { background: #AF161C; }
-        .catalog-link-dtl2 { background: #154889; }
+        .end-card-links-label {
+            color: var(--text-light);
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
 
-        /* ============================================
-           PRINT PROTECTION
-           ============================================ */
+        /* ===== PRINT BLOCKING ===== */
         @media print {
             html, body { display: none !important; }
         }
+
+        /* ===== MOBILE ===== */
+        @media (max-width: 640px) {
+            .toolbar-center { position: static; transform: none; }
+            #chapterName { display: none; }
+            #dtlBrand { display: none; }
+            .page-info { font-size: 12px; min-width: 60px; }
+            #pageContainer { padding: 12px 0; }
+            .toolbar-divider.hide-mobile { display: none; }
+        }
     </style>
-
-    <!-- =========================================================
-         BACK BUTTON TRAP (from base viewer)
-         ========================================================= -->
-    <script>
-    (function () {
-        "use strict";
-
-        var DTL_BLUE = "#154889";
-        var DTL_BLUE_HOVER = "#123F79";
-        var DTL_RED = "#AF161C";
-        var TEXT = "#1f2937";
-        var MUTED = "#6b7280";
-        var SESSION_KEY = "dtlTrapArmed";
-        var BUFFER_STATES = 200;
-        var trapArmedThisSession = false;
-
-        function isArmed() { return trapArmedThisSession; }
-
-        try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
-
-        function enableBeforeUnload() {
-            window.addEventListener("beforeunload", function (e) {
-                if (!isArmed()) return;
-                e.preventDefault();
-                e.returnValue = "";
-                return "";
-            });
-        }
-
-        function showSessionEndedOverlay() {
-            if (document.getElementById("dtl-session-ended-overlay")) return;
-
-            var overlay = document.createElement("div");
-            overlay.id = "dtl-session-ended-overlay";
-            overlay.style.cssText =
-                "position:fixed;inset:0;z-index:2147483647;" +
-                "background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;" +
-                "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:20px;";
-
-            overlay.innerHTML =
-                '<div style="background:white;max-width:460px;width:100%;border-radius:16px;padding:38px 30px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
-                    '<div style="font-size:56px;margin-bottom:14px;">🔒</div>' +
-                    '<div style="font-size:22px;font-weight:800;color:' + TEXT + ';margin-bottom:10px;">Session Ended</div>' +
-                    '<div style="color:' + MUTED + ';line-height:1.6;margin-bottom:18px;">Your viewing session has ended. For copyright protection, you cannot return to the previous page.</div>' +
-                    '<button id="dtl-session-return" style="width:100%;padding:14px 18px;border:0;border-radius:10px;background:' + DTL_BLUE + ';color:white;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:12px;">📖 Return to Chapter</button>' +
-                    '<div style="display:flex;flex-direction:column;gap:12px;margin-top:6px;">' +
-                        '<a href="https://libguides.thedtl.org/home" style="display:block;padding:14px 18px;border-radius:10px;background:' + DTL_RED + ';color:white;text-decoration:none;font-weight:800;">📖 DTL Catalog</a>' +
-                        '<a href="https://dtl2.libguides.com/home" style="display:block;padding:14px 18px;border-radius:10px;background:' + DTL_BLUE + ';color:white;text-decoration:none;font-weight:800;">📚 DTL2 Catalog</a>' +
-                    "</div>" +
-                    '<div style="color:#9ca3af;font-size:12px;margin-top:14px;line-height:1.5;">Need help? Contact your librarian for assistance.</div>' +
-                "</div>";
-
-            document.body.appendChild(overlay);
-            
-            var returnBtn = document.getElementById("dtl-session-return");
-            if (returnBtn) {
-                returnBtn.addEventListener("click", function() { overlay.remove(); });
-                returnBtn.addEventListener("mouseenter", function() { returnBtn.style.background = DTL_BLUE_HOVER; });
-                returnBtn.addEventListener("mouseleave", function() { returnBtn.style.background = DTL_BLUE; });
-            }
-        }
-
-        // Expose armTrapWithGesture globally for gesture gate
-        window.dtlArmTrap = function() {
-            try {
-                var baseUrl = location.href.split('#')[0];
-                history.replaceState({ dtlTrap: true, i: 0 }, "", baseUrl + '#dtl0');
-                for (var i = 1; i <= BUFFER_STATES; i++) {
-                    history.pushState({ dtlTrap: true, i: i }, "", baseUrl + '#dtl' + i);
-                }
-                trapArmedThisSession = true;
-                sessionStorage.setItem(SESSION_KEY, "1");
-                enableBeforeUnload();
-            } catch (e) {
-                trapArmedThisSession = true;
-                enableBeforeUnload();
-            }
-        };
-
-        var isFirefox = typeof navigator !== 'undefined' && /Firefox/i.test(navigator.userAgent);
-
-        window.addEventListener("popstate", function(evt) {
-            if (!isArmed()) return;
-            showSessionEndedOverlay();
-            if (isFirefox) {
-                setTimeout(function() { try { history.go(BUFFER_STATES); } catch(e) {} }, 50);
-            } else {
-                try { history.go(BUFFER_STATES); } catch(e) {}
-            }
-        });
-
-        window.addEventListener("pageshow", function(event) {
-            if (event && event.persisted) {
-                try {
-                    if (sessionStorage.getItem(SESSION_KEY) === "1") {
-                        showSessionEndedOverlay();
-                    }
-                } catch (e) {}
-            }
-        });
-    })();
-    </script>
 </head>
 
 <body>
-    <!-- TOOLBAR -->
+    <!-- ===== TOOLBAR ===== -->
     <div id="toolbar">
-        <div id="toolbar-left">
-            <span id="chapter-name"></span>
+        <div class="toolbar-section">
+            <span id="dtlBrand">DTL Reader</span>
         </div>
-        <div id="toolbar-center">
-            <button class="toolbar-btn" id="btn-prev" title="Previous Page">&#9650;</button>
-            <div style="display:flex;align-items:center;gap:4px;">
-                <input type="number" id="page-input" value="1" min="1">
-                <span id="page-indicator">/ –</span>
-            </div>
-            <button class="toolbar-btn" id="btn-next" title="Next Page">&#9660;</button>
-            <div class="toolbar-separator"></div>
-            <button class="toolbar-btn" id="btn-zoom-out" title="Zoom Out">−</button>
-            <select id="zoom-select" title="Zoom Level">
-                <option value="fit-width">Fit Width</option>
-                <option value="fit-page">Fit Page</option>
-                <option value="0.5">50%</option>
-                <option value="0.75">75%</option>
-                <option value="1">100%</option>
-                <option value="1.25">125%</option>
-                <option value="1.5">150%</option>
-                <option value="2">200%</option>
-            </select>
-            <button class="toolbar-btn" id="btn-zoom-in" title="Zoom In">+</button>
+
+        <div class="toolbar-center">
+            <button class="toolbar-btn" id="btnPrevPage" title="Previous page" disabled>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span class="page-info" id="pageInfo">— / —</span>
+            <button class="toolbar-btn" id="btnNextPage" title="Next page" disabled>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4L10 8L6 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="toolbar-divider"></div>
+            <button class="toolbar-btn" id="btnZoomOut" title="Zoom out">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 8H12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+            <span class="zoom-display" id="zoomDisplay">100%</span>
+            <button class="toolbar-btn" id="btnZoomIn" title="Zoom in">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 4V12M4 8H12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+            <button class="toolbar-btn" id="btnFitWidth" title="Fit to width" style="font-size: 13px; font-weight: 700;">W</button>
         </div>
-        <div id="toolbar-right">
-            <!-- Download button, hidden by default -->
-            <button class="toolbar-btn" id="btn-download" style="display:none;" title="Download">⬇ Save</button>
+
+        <div class="toolbar-section">
+            <!-- Right side intentionally minimal -->
         </div>
     </div>
 
-    <!-- SCROLLABLE PAGE CONTAINER -->
-    <div id="viewer-container"></div>
+    <!-- ===== PAGE CONTAINER ===== -->
+    <div id="pageContainer"></div>
 
-    <!-- LOADING OVERLAY -->
-    <div id="loading-overlay">
-        <div class="spinner"></div>
-        <div class="text">Loading document...</div>
-    </div>
-
-    <!-- PDF.js Library (core only, no viewer UI) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-
-    <!-- =========================================================
-         MAIN VIEWER SCRIPT
-         ========================================================= -->
+    <!-- ==========================================================
+         DTL STREAMING PDF VIEWER
+         Security, rendering, and navigation logic
+         ========================================================== -->
     <script>
     (function() {
         'use strict';
@@ -470,45 +428,51 @@
         // CONFIGURATION
         // =============================================================
         var WORKER_URL = 'https://dtl-pdf-stream.reference-dfe.workers.dev';
-        var PREFETCH_AHEAD = 3;  // Pages to prefetch ahead of current view
-        var PREFETCH_BEHIND = 2; // Pages to keep rendered behind current view
-        var MAX_RENDERED = 12;   // Max pages to keep rendered at once
+        var PREFETCH_AHEAD = 3;
+        var PREFETCH_BEHIND = 1;
+        var OBSERVER_MARGIN = '600px';
 
         // =============================================================
-        // PDF.js SETUP
+        // DTL PALETTE
         // =============================================================
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        var DTL_BLUE = '#154889';
+        var DTL_BLUE_HOVER = '#123F79';
+        var DTL_RED = '#AF161C';
+        var MUTED_COLOR = '#6b7280';
 
         // =============================================================
-        // ERROR PAGE
+        // FRIENDLY ERROR PAGE
         // =============================================================
         function showErrorPage(icon, title, message) {
-            document.documentElement.innerHTML =
-                '<head><title>' + title + ' | Digital Theological Library</title>' +
-                '<meta name="viewport" content="width=device-width, initial-scale=1">' +
-                '<style>' +
-                '* { box-sizing: border-box; margin: 0; padding: 0; }' +
-                'body { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%); padding: 20px; }' +
-                '.card { background: white; padding: 48px 40px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); text-align: center; max-width: 420px; width: 100%; }' +
-                '.icon { font-size: 56px; margin-bottom: 20px; }' +
-                'h1 { margin: 0 0 12px 0; color: #1f2937; font-size: 24px; font-weight: 700; }' +
-                '.message { color: #6b7280; margin: 0 0 28px 0; line-height: 1.6; }' +
-                '.links { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }' +
-                '.btn { display: block; padding: 14px 24px; color: white; text-decoration: none; border-radius: 8px; font-weight: 800; text-align: center; }' +
-                '.btn-primary { background: #AF161C; }' +
-                '.btn-secondary { background: #154889; }' +
-                '.help { font-size: 13px; color: #9ca3af; }' +
-                '</style></head>' +
-                '<body><div class="card">' +
-                '<div class="icon">' + icon + '</div>' +
-                '<h1>' + title + '</h1>' +
-                '<p class="message">' + message + '</p>' +
-                '<div class="links">' +
-                '<a href="https://libguides.thedtl.org/home" class="btn btn-primary">📖 DTL Catalog</a>' +
-                '<a href="https://dtl2.libguides.com/home" class="btn btn-secondary">📚 DTL2 Catalog</a>' +
-                '</div>' +
-                '<p class="help">Need help? Contact your librarian for assistance.</p>' +
-                '</div></body>';
+            document.documentElement.innerHTML = '\
+                <head>\
+                    <title>' + title + ' | Digital Theological Library</title>\
+                    <meta name="viewport" content="width=device-width, initial-scale=1">\
+                    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">\
+                    <style>\
+                        * { box-sizing: border-box; margin: 0; padding: 0; }\
+                        body { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: DM Sans, -apple-system, sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%); padding: 20px; }\
+                        .card { background: white; padding: 48px 40px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); text-align: center; max-width: 420px; width: 100%; }\
+                        .icon { font-size: 56px; margin-bottom: 20px; }\
+                        h1 { margin: 0 0 12px 0; color: #1f2937; font-size: 24px; font-weight: 700; }\
+                        .msg { color: #6b7280; margin: 0 0 28px 0; line-height: 1.6; }\
+                        .links { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }\
+                        .btn { display: block; padding: 14px 24px; color: white; text-decoration: none; border-radius: 8px; font-weight: 700; text-align: center; }\
+                        .help { font-size: 13px; color: #9ca3af; }\
+                    </style>\
+                </head>\
+                <body>\
+                    <div class="card">\
+                        <div class="icon">' + icon + '</div>\
+                        <h1>' + title + '</h1>\
+                        <p class="msg">' + message + '</p>\
+                        <div class="links">\
+                            <a href="https://libguides.thedtl.org/home" class="btn" style="background:#AF161C;">📖 DTL Catalog</a>\
+                            <a href="https://dtl2.libguides.com/home" class="btn" style="background:#154889;">📚 DTL2 Catalog</a>\
+                        </div>\
+                        <p class="help">Need help? Contact your librarian for assistance.</p>\
+                    </div>\
+                </body>';
             window.stop();
         }
 
@@ -530,10 +494,10 @@
         // =============================================================
         // SECURITY CHECKS
         // =============================================================
-        var ALLOWED_HOSTS = ["thedtl.org", "thedtl.github.io", "oclc.org", "libapps.com", "libguides.com", "springshare.com", "localhost", "127.0.0.1"];
+        var ALLOWED_HOSTS = ['thedtl.org', 'thedtl.github.io', 'oclc.org', 'libapps.com', 'libguides.com', 'springshare.com', 'localhost', '127.0.0.1'];
         var isLocalDev = ['localhost', '127.0.0.1'].indexOf(location.hostname) !== -1;
 
-        var referrer = document.referrer || "";
+        var referrer = document.referrer || '';
         if (!referrer && window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) {
             referrer = window.location.ancestorOrigins[window.location.ancestorOrigins.length - 1];
         }
@@ -542,13 +506,13 @@
 
         if (!referrer && !isLocalDev) {
             showErrorPage('🚫', 'New Tab/Window Not Allowed', 'For copyright protection, this resource cannot be opened in a new tab or window. Please click the link directly from the chapter list.');
-            throw new Error("Access Denied: No Referrer");
+            throw new Error('Access Denied: No Referrer');
         }
 
         var historyThreshold = isFirefoxBrowser ? 2 : 1;
         if (window.history.length <= historyThreshold && !isLocalDev) {
             showErrorPage('🚫', 'New Tab/Window Not Allowed', 'For copyright protection, this resource cannot be opened in a new tab or window. Please click the link directly from the chapter list.');
-            throw new Error("Access Denied: New tab/window");
+            throw new Error('Access Denied: New tab/window');
         }
 
         var isAllowedReferrer = isLocalDev || ALLOWED_HOSTS.some(function(host) {
@@ -557,7 +521,7 @@
 
         if (!isAllowedReferrer) {
             showErrorPage('🔗', 'Invalid Link Source', 'This resource must be accessed through the library website.');
-            throw new Error("Access Denied: Invalid Referrer");
+            throw new Error('Access Denied: Invalid Referrer');
         }
 
         // =============================================================
@@ -565,26 +529,37 @@
         // =============================================================
         var urlParams = new URLSearchParams(window.location.search);
         var token = urlParams.get('token');
+
         if (!token) {
-            showErrorPage('🔑', 'Missing Access Token', 'No access token was provided. Please return to the catalog and click the chapter link.');
-            throw new Error("No token");
+            showErrorPage('🔑', 'Missing Access Token', 'No access token was provided. Please return to the catalog and click the chapter link to access this resource.');
+            throw new Error('No token provided');
         }
 
         var payload = decodeToken(token);
-        if (!payload) {
-            showErrorPage('🔑', 'Invalid Link', 'This link appears to be invalid or corrupted. Please return to the catalog and try again.');
-            throw new Error("Invalid token");
+
+        if (!payload || !payload.s || !payload.e) {
+            showErrorPage('🔑', 'Invalid Access Token', 'The access token is invalid or corrupted. Please return to the catalog and try again.');
+            throw new Error('Invalid token');
         }
 
-        var chapterStart = payload.s;
-        var chapterEnd = payload.e;
-        var chapterName = payload.c ? decodeURIComponent(payload.c) : '';
-        var allowDownload = payload.d === 1;
+        // =============================================================
+        // CHAPTER CONFIG
+        // =============================================================
+        var CONFIG = {
+            token: token,
+            start: payload.s,
+            end: payload.e,
+            chapterName: payload.c || '',
+            allowDownload: payload.d === 1,
+            totalPages: payload.e - payload.s + 1
+        };
+
+        console.log('[DTL] Config:', CONFIG);
 
         // =============================================================
-        // KEYBOARD & CONTEXT MENU RESTRICTIONS
+        // KEYBOARD / INPUT BLOCKING
         // =============================================================
-        if (!allowDownload) {
+        if (!CONFIG.allowDownload) {
             document.addEventListener('keydown', function(e) {
                 if ((e.ctrlKey || e.metaKey) && ['s', 'p', 'o', 'u'].indexOf(e.key.toLowerCase()) !== -1) {
                     e.preventDefault();
@@ -595,30 +570,450 @@
         }
 
         document.addEventListener('contextmenu', function(e) { e.preventDefault(); }, true);
-
-        document.addEventListener('auxclick', function(e) {
-            if (e.button === 1) { e.preventDefault(); e.stopPropagation(); }
-        }, true);
-
-        document.addEventListener('click', function(e) {
-            if (e.ctrlKey || e.metaKey || e.shiftKey) { e.preventDefault(); e.stopPropagation(); }
-        }, true);
-
+        document.addEventListener('auxclick', function(e) { if (e.button === 1) { e.preventDefault(); e.stopPropagation(); } }, true);
+        document.addEventListener('click', function(e) { if (e.ctrlKey || e.metaKey || e.shiftKey) { e.preventDefault(); e.stopPropagation(); } }, true);
         document.addEventListener('dragstart', function(e) { e.preventDefault(); }, true);
 
         // =============================================================
-        // VIEWER STATE
+        // BACK BUTTON TRAP
         // =============================================================
-        var totalChapterPages = chapterEnd - chapterStart + 1;
-        var currentPage = 1; // Relative page (1-based within chapter)
-        var currentScale = 'fit-width';
-        var numericScale = 1;
-        var pageWidth = 612;  // Default letter width in PDF points
-        var pageHeight = 792; // Default letter height in PDF points
-        var pageDimensions = null; // Set after first page loads
-        var pageStates = {};  // pageNum -> { state: 'empty'|'loading'|'rendered'|'error', pdfDoc, canvas }
-        var viewerContainer = null;
-        var isInitialized = false;
+        var BUFFER_STATES = 200;
+        var trapArmedThisSession = false;
+        var SESSION_KEY = 'dtlStreamTrapArmed';
+        try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+
+        function isArmed() { return trapArmedThisSession; }
+
+        function enableBeforeUnload() {
+            window.addEventListener('beforeunload', function(e) {
+                if (!isArmed()) return;
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            });
+        }
+
+        function showSessionEndedOverlay() {
+            if (document.getElementById('dtl-session-ended')) return;
+
+            var overlay = document.createElement('div');
+            overlay.id = 'dtl-session-ended';
+            overlay.className = 'overlay';
+            overlay.innerHTML =
+                '<div class="overlay-card">' +
+                    '<div class="overlay-icon">🔒</div>' +
+                    '<div class="overlay-title">Session Ended</div>' +
+                    '<div class="overlay-message">Your viewing session has ended. For copyright protection, you cannot return to the previous page.</div>' +
+                    '<button class="overlay-btn btn-blue" id="dtl-session-return">📖 Return to Chapter</button>' +
+                    '<div class="catalog-links">' +
+                        '<a href="https://libguides.thedtl.org/home" class="catalog-link" style="background:#AF161C;">📖 DTL Catalog</a>' +
+                        '<a href="https://dtl2.libguides.com/home" class="catalog-link" style="background:#154889;">📚 DTL2 Catalog</a>' +
+                    '</div>' +
+                    '<div class="overlay-hint" style="margin-top:14px;">Need help? Contact your librarian for assistance.</div>' +
+                '</div>';
+
+            document.body.appendChild(overlay);
+
+            document.getElementById('dtl-session-return').addEventListener('click', function() {
+                overlay.remove();
+            });
+        }
+
+        function armTrapWithGesture() {
+            try {
+                var baseUrl = location.href.split('#')[0];
+                history.replaceState({ dtlTrap: true, i: 0 }, '', baseUrl + '#dtl0');
+                for (var i = 1; i <= BUFFER_STATES; i++) {
+                    history.pushState({ dtlTrap: true, i: i }, '', baseUrl + '#dtl' + i);
+                }
+                trapArmedThisSession = true;
+                sessionStorage.setItem(SESSION_KEY, '1');
+                enableBeforeUnload();
+            } catch (e) {
+                trapArmedThisSession = true;
+                enableBeforeUnload();
+            }
+        }
+
+        window.addEventListener('popstate', function() {
+            if (!isArmed()) return;
+            showSessionEndedOverlay();
+            if (isFirefoxBrowser) {
+                setTimeout(function() { try { history.go(BUFFER_STATES); } catch (e) {} }, 50);
+            } else {
+                try { history.go(BUFFER_STATES); } catch (e) {}
+            }
+        });
+
+        window.addEventListener('pageshow', function(event) {
+            if (event && event.persisted) {
+                try { if (sessionStorage.getItem(SESSION_KEY) === '1') showSessionEndedOverlay(); } catch (e) {}
+            }
+        });
+
+        // =============================================================
+        // PDF.js SETUP
+        // =============================================================
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // =============================================================
+        // STATE
+        // =============================================================
+        var RENDER_SCALE = 1.5;       // base rendering quality
+        var displayScale = 1.0;       // user zoom level
+        var baseWidth = null;         // natural width of first page at RENDER_SCALE
+        var pageSlots = [];           // page-slot DOM elements
+        var pageCache = {};           // pageNumber -> { bytes, rendered, width, height }
+        var pageFetching = {};        // pageNumber -> true
+        var currentVisiblePage = CONFIG.start;
+        var serverTotalPages = null;
+        var viewerInitialized = false;
+
+        // DOM references
+        var containerEl = document.getElementById('pageContainer');
+        var pageInfoEl = document.getElementById('pageInfo');
+        var zoomDisplayEl = document.getElementById('zoomDisplay');
+        var btnPrev = document.getElementById('btnPrevPage');
+        var btnNext = document.getElementById('btnNextPage');
+        var btnZoomIn = document.getElementById('btnZoomIn');
+        var btnZoomOut = document.getElementById('btnZoomOut');
+        var btnFitWidth = document.getElementById('btnFitWidth');
+
+        // =============================================================
+        // FETCH SINGLE PAGE FROM WORKER
+        // =============================================================
+        function fetchPage(pageNum) {
+            if (pageCache[pageNum]) return Promise.resolve(pageCache[pageNum]);
+            if (pageFetching[pageNum]) {
+                // Return a promise that waits for the existing fetch
+                return new Promise(function(resolve, reject) {
+                    var check = setInterval(function() {
+                        if (pageCache[pageNum]) { clearInterval(check); resolve(pageCache[pageNum]); }
+                        if (!pageFetching[pageNum] && !pageCache[pageNum]) { clearInterval(check); reject(new Error('Fetch failed')); }
+                    }, 100);
+                    setTimeout(function() { clearInterval(check); reject(new Error('Timeout')); }, 30000);
+                });
+            }
+
+            pageFetching[pageNum] = true;
+
+            var url = WORKER_URL + '/page?token=' + encodeURIComponent(CONFIG.token) + '&page=' + pageNum;
+
+            return fetch(url)
+                .then(function(response) {
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+
+                    // Read total pages from headers (first response sets this)
+                    var tp = parseInt(response.headers.get('X-DTL-Total-Pages'));
+                    if (tp && !serverTotalPages) {
+                        serverTotalPages = tp;
+                        CONFIG.end = Math.min(CONFIG.end, tp);
+                        CONFIG.totalPages = CONFIG.end - CONFIG.start + 1;
+                        console.log('[DTL] Server total pages:', tp, '| Effective range:', CONFIG.start, '-', CONFIG.end);
+                    }
+
+                    return response.arrayBuffer();
+                })
+                .then(function(buffer) {
+                    pageCache[pageNum] = { bytes: new Uint8Array(buffer), rendered: false, width: 0, height: 0 };
+                    pageFetching[pageNum] = false;
+                    return pageCache[pageNum];
+                })
+                .catch(function(err) {
+                    console.error('[DTL] Fetch page ' + pageNum + ' failed:', err);
+                    pageFetching[pageNum] = false;
+                    throw err;
+                });
+        }
+
+        // =============================================================
+        // RENDER SINGLE PAGE INTO ITS SLOT
+        // =============================================================
+        function renderPage(pageNum) {
+            var cached = pageCache[pageNum];
+            if (!cached) return Promise.resolve();
+
+            var slotIndex = pageNum - CONFIG.start;
+            if (slotIndex < 0 || slotIndex >= pageSlots.length) return Promise.resolve();
+            var slot = pageSlots[slotIndex];
+            if (!slot) return Promise.resolve();
+
+            // Skip if already rendered at current zoom
+            if (cached.rendered && cached.renderedZoom === displayScale) return Promise.resolve();
+
+            return pdfjsLib.getDocument({ data: cached.bytes.slice() }).promise
+                .then(function(pdf) {
+                    return pdf.getPage(1);
+                })
+                .then(function(page) {
+                    var scale = RENDER_SCALE * displayScale;
+                    var viewport = page.getViewport({ scale: scale });
+
+                    // Store natural dimensions (at base render scale)
+                    if (!cached.width) {
+                        var natVp = page.getViewport({ scale: RENDER_SCALE });
+                        cached.width = natVp.width;
+                        cached.height = natVp.height;
+                        if (!baseWidth) baseWidth = natVp.width;
+                    }
+
+                    // Get or create canvas
+                    var canvas = slot.querySelector('canvas');
+                    if (!canvas) {
+                        canvas = document.createElement('canvas');
+                        var loading = slot.querySelector('.page-loading');
+                        if (loading) loading.remove();
+                        var error = slot.querySelector('.page-error');
+                        if (error) error.remove();
+                        slot.appendChild(canvas);
+                    }
+
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    canvas.style.width = viewport.width + 'px';
+                    canvas.style.height = viewport.height + 'px';
+                    slot.style.width = viewport.width + 'px';
+                    slot.style.height = viewport.height + 'px';
+
+                    var ctx = canvas.getContext('2d');
+                    return page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                })
+                .then(function() {
+                    cached.rendered = true;
+                    cached.renderedZoom = displayScale;
+                })
+                .catch(function(err) {
+                    console.error('[DTL] Render page ' + pageNum + ' error:', err);
+                    showPageError(pageNum);
+                });
+        }
+
+        // =============================================================
+        // PAGE ERROR DISPLAY
+        // =============================================================
+        function showPageError(pageNum) {
+            var slotIndex = pageNum - CONFIG.start;
+            if (slotIndex < 0 || slotIndex >= pageSlots.length) return;
+            var slot = pageSlots[slotIndex];
+            if (!slot) return;
+
+            var loading = slot.querySelector('.page-loading');
+            if (loading) loading.remove();
+            if (slot.querySelector('.page-error')) return;
+
+            var errorDiv = document.createElement('div');
+            errorDiv.className = 'page-error';
+            errorDiv.innerHTML =
+                '<div class="page-error-icon">⚠️</div>' +
+                '<div>Failed to load page</div>' +
+                '<button class="page-error-retry">Retry</button>';
+            slot.appendChild(errorDiv);
+
+            errorDiv.querySelector('.page-error-retry').addEventListener('click', function() {
+                errorDiv.remove();
+                var loadDiv = document.createElement('div');
+                loadDiv.className = 'page-loading';
+                loadDiv.innerHTML = '<div class="page-loading-spinner"></div><div class="page-loading-text">Loading page...</div>';
+                slot.appendChild(loadDiv);
+                delete pageCache[pageNum];
+                delete pageFetching[pageNum];
+                fetchAndRenderPage(pageNum);
+            });
+        }
+
+        // =============================================================
+        // FETCH + RENDER
+        // =============================================================
+        function fetchAndRenderPage(pageNum) {
+            if (pageNum < CONFIG.start || pageNum > CONFIG.end) return Promise.resolve();
+            if (pageCache[pageNum] && pageCache[pageNum].rendered && pageCache[pageNum].renderedZoom === displayScale) return Promise.resolve();
+
+            return fetchPage(pageNum)
+                .then(function() { return renderPage(pageNum); })
+                .catch(function() { showPageError(pageNum); });
+        }
+
+        // =============================================================
+        // CREATE PAGE SLOTS + END CARD
+        // =============================================================
+        function createPageSlots() {
+            containerEl.innerHTML = '';
+            pageSlots = [];
+
+            for (var i = CONFIG.start; i <= CONFIG.end; i++) {
+                var wrapper = document.createElement('div');
+                wrapper.className = 'page-wrapper';
+                wrapper.dataset.page = String(i);
+
+                var slot = document.createElement('div');
+                slot.className = 'page-slot';
+                slot.style.width = '612px';
+                slot.style.height = '792px';
+
+                var loading = document.createElement('div');
+                loading.className = 'page-loading';
+                loading.innerHTML = '<div class="page-loading-spinner"></div><div class="page-loading-text">Loading page ' + (i - CONFIG.start + 1) + '...</div>';
+                slot.appendChild(loading);
+
+                wrapper.appendChild(slot);
+                containerEl.appendChild(wrapper);
+                pageSlots.push(slot);
+            }
+
+            // End-of-chapter card
+            var endWrapper = document.createElement('div');
+            endWrapper.className = 'end-card-wrapper';
+
+            endWrapper.innerHTML =
+                '<div class="end-card">' +
+                    '<div class="end-card-icon">📖</div>' +
+                    '<div class="end-card-title">End of Chapter</div>' +
+                    '<div class="end-card-message">You\'ve reached the end of this section.</div>' +
+                    '<div class="end-card-links">' +
+                        '<div class="end-card-links-label">Looking for more? Browse our catalogs:</div>' +
+                        '<a href="https://libguides.thedtl.org/home" class="catalog-link" style="background:#AF161C;">📖 DTL Catalog</a>' +
+                        '<a href="https://dtl2.libguides.com/home" class="catalog-link" style="background:#154889;">📚 DTL2 Catalog</a>' +
+                    '</div>' +
+                '</div>';
+
+            containerEl.appendChild(endWrapper);
+        }
+
+        // =============================================================
+        // INTERSECTION OBSERVER (LAZY LOADING)
+        // =============================================================
+        var observer = null;
+
+        function setupObserver() {
+            if (observer) observer.disconnect();
+
+            observer = new IntersectionObserver(function(entries) {
+                entries.forEach(function(entry) {
+                    if (!entry.isIntersecting) return;
+                    var pageNum = parseInt(entry.target.dataset.page);
+                    if (isNaN(pageNum)) return;
+
+                    fetchAndRenderPage(pageNum);
+                    for (var a = 1; a <= PREFETCH_AHEAD; a++) fetchAndRenderPage(pageNum + a);
+                    for (var b = 1; b <= PREFETCH_BEHIND; b++) fetchAndRenderPage(pageNum - b);
+                });
+            }, {
+                root: containerEl,
+                rootMargin: OBSERVER_MARGIN
+            });
+
+            var wrappers = containerEl.querySelectorAll('.page-wrapper');
+            for (var i = 0; i < wrappers.length; i++) {
+                observer.observe(wrappers[i]);
+            }
+        }
+
+        // =============================================================
+        // SCROLL TRACKING
+        // =============================================================
+        function updateCurrentPage() {
+            var containerRect = containerEl.getBoundingClientRect();
+            var containerCenter = containerRect.top + containerRect.height / 2;
+            var closestPage = CONFIG.start;
+            var closestDist = Infinity;
+
+            for (var i = 0; i < pageSlots.length; i++) {
+                var rect = pageSlots[i].getBoundingClientRect();
+                var center = rect.top + rect.height / 2;
+                var dist = Math.abs(center - containerCenter);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closestPage = CONFIG.start + i;
+                }
+            }
+
+            if (closestPage !== currentVisiblePage) {
+                currentVisiblePage = closestPage;
+                updateToolbar();
+            }
+        }
+
+        var scrollRaf = null;
+        containerEl.addEventListener('scroll', function() {
+            if (scrollRaf) cancelAnimationFrame(scrollRaf);
+            scrollRaf = requestAnimationFrame(updateCurrentPage);
+        });
+
+        // =============================================================
+        // TOOLBAR
+        // =============================================================
+        function updateToolbar() {
+            var relPage = currentVisiblePage - CONFIG.start + 1;
+            pageInfoEl.textContent = relPage + ' / ' + CONFIG.totalPages;
+            zoomDisplayEl.textContent = Math.round(displayScale * 100) + '%';
+            btnPrev.disabled = (currentVisiblePage <= CONFIG.start);
+            btnNext.disabled = (currentVisiblePage >= CONFIG.end);
+        }
+
+        // =============================================================
+        // NAVIGATION
+        // =============================================================
+        function goToPage(pageNum) {
+            if (pageNum < CONFIG.start || pageNum > CONFIG.end) return;
+            var idx = pageNum - CONFIG.start;
+            var wrappers = containerEl.querySelectorAll('.page-wrapper');
+            if (wrappers[idx]) {
+                wrappers[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        btnPrev.addEventListener('click', function() { goToPage(currentVisiblePage - 1); });
+        btnNext.addEventListener('click', function() { goToPage(currentVisiblePage + 1); });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goToPage(currentVisiblePage - 1); }
+            else if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); goToPage(currentVisiblePage + 1); }
+            else if (e.key === 'Home') { e.preventDefault(); goToPage(CONFIG.start); }
+            else if (e.key === 'End') { e.preventDefault(); goToPage(CONFIG.end); }
+        });
+
+        // =============================================================
+        // ZOOM
+        // =============================================================
+        var ZOOM_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0];
+
+        function reRenderAllVisible() {
+            var keys = Object.keys(pageCache);
+            for (var i = 0; i < keys.length; i++) {
+                var pn = parseInt(keys[i]);
+                if (pageCache[pn] && pageCache[pn].bytes) {
+                    pageCache[pn].rendered = false;
+                    renderPage(pn);
+                }
+            }
+            updateToolbar();
+        }
+
+        function zoomTo(newScale) {
+            displayScale = Math.max(0.5, Math.min(3.0, newScale));
+            reRenderAllVisible();
+        }
+
+        btnZoomIn.addEventListener('click', function() {
+            for (var i = 0; i < ZOOM_STEPS.length; i++) {
+                if (ZOOM_STEPS[i] > displayScale) { zoomTo(ZOOM_STEPS[i]); return; }
+            }
+        });
+
+        btnZoomOut.addEventListener('click', function() {
+            for (var i = ZOOM_STEPS.length - 1; i >= 0; i--) {
+                if (ZOOM_STEPS[i] < displayScale) { zoomTo(ZOOM_STEPS[i]); return; }
+            }
+        });
+
+        btnFitWidth.addEventListener('click', function() {
+            if (!baseWidth) return;
+            var containerWidth = containerEl.clientWidth - 48;
+            var fitScale = containerWidth / baseWidth;
+            fitScale = Math.round(fitScale * 20) / 20;
+            fitScale = Math.max(0.5, Math.min(3.0, fitScale));
+            zoomTo(fitScale);
+        });
 
         // =============================================================
         // GESTURE GATE
@@ -626,556 +1021,68 @@
         function showGestureGate() {
             var gate = document.createElement('div');
             gate.id = 'dtl-gesture-gate';
-            gate.style.cssText =
-                'position:fixed;inset:0;z-index:2147483647;' +
-                'background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;' +
-                'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:20px;' +
-                'opacity:0;transition:opacity 0.2s ease;';
+            gate.className = 'overlay';
+            gate.style.opacity = '0';
+            gate.style.transition = 'opacity 0.2s ease';
 
             gate.innerHTML =
-                '<div style="background:white;max-width:460px;width:100%;border-radius:16px;padding:34px 28px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);transform:scale(0.95);transition:transform 0.2s ease;" id="dtl-gate-card">' +
-                    '<div style="font-size:52px;margin-bottom:14px;">📖</div>' +
-                    '<div style="font-size:22px;font-weight:800;color:#1f2937;margin-bottom:10px;">Start Reading</div>' +
-                    (chapterName ? '<div style="color:#6b7280;font-size:15px;margin-bottom:6px;">' + chapterName + '</div>' : '') +
-                    '<div style="color:#6b7280;line-height:1.6;margin-bottom:18px;">Click below to begin your secure viewing session.</div>' +
-                    '<button id="dtl-start-reading" style="width:100%;padding:14px 18px;border:0;border-radius:10px;background:#154889;color:white;font-weight:800;font-size:15px;cursor:pointer;transition:background 0.15s ease;">Begin Session</button>' +
-                    '<div style="color:#9ca3af;font-size:12px;margin-top:12px;line-height:1.5;">Using the browser back button will end your session.</div>' +
-                    '<div style="color:#9ca3af;font-size:11px;margin-top:8px;line-height:1.4;font-style:italic;">Firefox users: The back button may appear disabled for copyright protection.</div>' +
+                '<div class="overlay-card" id="dtl-gate-card" style="transform:scale(0.95);transition:transform 0.2s ease;">' +
+                    '<div class="overlay-icon">📖</div>' +
+                    '<div class="overlay-title">Start Reading</div>' +
+                    '<div class="overlay-message">Click below to begin your secure viewing session.</div>' +
+                    '<button class="overlay-btn btn-blue" id="dtl-start-reading">Begin Session</button>' +
+                    '<div class="overlay-hint">Using the browser back button will end your session.</div>' +
+                    (isFirefoxBrowser ? '<div class="overlay-hint" style="font-style:italic;margin-top:4px;">Firefox users: The back button may appear disabled for copyright protection.</div>' : '') +
                 '</div>';
 
             document.body.appendChild(gate);
 
             requestAnimationFrame(function() {
                 gate.style.opacity = '1';
-                var card = gate.querySelector('#dtl-gate-card');
+                var card = document.getElementById('dtl-gate-card');
                 if (card) card.style.transform = 'scale(1)';
             });
 
-            var btn = gate.querySelector('#dtl-start-reading');
-            btn.addEventListener('click', function() {
-                // Arm back button trap
-                if (window.dtlArmTrap) window.dtlArmTrap();
-
-                // Fade out
+            document.getElementById('dtl-start-reading').addEventListener('click', function() {
+                armTrapWithGesture();
                 gate.style.opacity = '0';
-                var card = gate.querySelector('#dtl-gate-card');
+                var card = document.getElementById('dtl-gate-card');
                 if (card) card.style.transform = 'scale(0.95)';
-
-                setTimeout(function() {
-                    gate.remove();
-                    initializeViewer();
-                }, 200);
+                setTimeout(function() { gate.remove(); initViewer(); }, 200);
             }, { once: true });
-
-            btn.addEventListener('mouseenter', function() { btn.style.background = '#123F79'; });
-            btn.addEventListener('mouseleave', function() { btn.style.background = '#154889'; });
         }
 
         // =============================================================
-        // UI SETUP
+        // INITIALIZE VIEWER
         // =============================================================
-        function setupUI() {
-            viewerContainer = document.getElementById('viewer-container');
+        function initViewer() {
+            if (viewerInitialized) return;
+            viewerInitialized = true;
 
-            // Chapter name
-            var chapterNameEl = document.getElementById('chapter-name');
-            if (chapterName) {
-                chapterNameEl.textContent = chapterName;
-            } else {
-                chapterNameEl.textContent = 'PDF Viewer';
-            }
+            createPageSlots();
+            updateToolbar();
+            setupObserver();
 
-            // Page counter
-            document.getElementById('page-indicator').textContent = '/ ' + totalChapterPages;
+            // Fetch first page to get server metadata, then auto-fit
+            fetchAndRenderPage(CONFIG.start).then(function() {
+                // Server may have adjusted CONFIG.end
+                var currentSlots = pageSlots.length;
+                var expectedSlots = CONFIG.end - CONFIG.start + 1;
+                if (expectedSlots !== currentSlots) {
+                    createPageSlots();
+                    setupObserver();
+                }
+                updateToolbar();
 
-            // Download button
-            if (allowDownload) {
-                document.getElementById('btn-download').style.display = '';
-            }
-
-            // Button handlers
-            document.getElementById('btn-prev').addEventListener('click', function() {
-                if (currentPage > 1) goToPage(currentPage - 1);
-            });
-
-            document.getElementById('btn-next').addEventListener('click', function() {
-                if (currentPage < totalChapterPages) goToPage(currentPage + 1);
-            });
-
-            document.getElementById('btn-zoom-out').addEventListener('click', function() {
-                zoomStep(-1);
-            });
-
-            document.getElementById('btn-zoom-in').addEventListener('click', function() {
-                zoomStep(1);
-            });
-
-            document.getElementById('zoom-select').addEventListener('change', function() {
-                currentScale = this.value;
-                rerenderAllPages();
-            });
-
-            // Page input
-            var pageInput = document.getElementById('page-input');
-            pageInput.max = totalChapterPages;
-            pageInput.addEventListener('change', function() {
-                var val = parseInt(this.value, 10);
-                if (isNaN(val) || val < 1) val = 1;
-                if (val > totalChapterPages) val = totalChapterPages;
-                this.value = val;
-                goToPage(val);
-            });
-
-            pageInput.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
-                    this.blur();
+                // Auto fit-to-width
+                if (baseWidth) {
+                    var w = containerEl.clientWidth - 48;
+                    var fit = Math.round((w / baseWidth) * 20) / 20;
+                    fit = Math.max(0.5, Math.min(3.0, fit));
+                    displayScale = fit;
+                    reRenderAllVisible();
                 }
             });
-
-            // Keyboard navigation
-            document.addEventListener('keydown', function(e) {
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-                
-                if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-                    e.preventDefault();
-                    if (currentPage > 1) goToPage(currentPage - 1);
-                } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
-                    e.preventDefault();
-                    if (currentPage < totalChapterPages) goToPage(currentPage + 1);
-                } else if (e.key === 'Home') {
-                    e.preventDefault();
-                    goToPage(1);
-                } else if (e.key === 'End') {
-                    e.preventDefault();
-                    goToPage(totalChapterPages);
-                }
-            });
-        }
-
-        // =============================================================
-        // ZOOM
-        // =============================================================
-        var ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-
-        function calculateScale() {
-            if (!pageDimensions) return 1;
-
-            var containerWidth = viewerContainer.clientWidth - 32; // padding
-            var containerHeight = viewerContainer.clientHeight - 32;
-
-            if (currentScale === 'fit-width') {
-                return containerWidth / pageDimensions.width;
-            } else if (currentScale === 'fit-page') {
-                var scaleW = containerWidth / pageDimensions.width;
-                var scaleH = containerHeight / pageDimensions.height;
-                return Math.min(scaleW, scaleH);
-            } else {
-                return parseFloat(currentScale);
-            }
-        }
-
-        function zoomStep(direction) {
-            var current = calculateScale();
-            var select = document.getElementById('zoom-select');
-            var newLevel = null;
-
-            if (direction > 0) {
-                for (var i = 0; i < ZOOM_LEVELS.length; i++) {
-                    if (ZOOM_LEVELS[i] > current + 0.01) {
-                        newLevel = ZOOM_LEVELS[i];
-                        break;
-                    }
-                }
-            } else {
-                for (var i = ZOOM_LEVELS.length - 1; i >= 0; i--) {
-                    if (ZOOM_LEVELS[i] < current - 0.01) {
-                        newLevel = ZOOM_LEVELS[i];
-                        break;
-                    }
-                }
-            }
-
-            if (newLevel !== null) {
-                currentScale = String(newLevel);
-                select.value = currentScale;
-                // If the value doesn't match a select option, that's fine
-                rerenderAllPages();
-            }
-        }
-
-        // =============================================================
-        // PAGE FETCHING & RENDERING
-        // =============================================================
-        function getAbsolutePage(relativePage) {
-            return chapterStart + relativePage - 1;
-        }
-
-        async function fetchPagePdf(relativePage) {
-            var absPage = getAbsolutePage(relativePage);
-            var url = WORKER_URL + '/page?token=' + encodeURIComponent(token) + '&page=' + absPage;
-
-            var response = await fetch(url);
-
-            if (!response.ok) {
-                throw new Error('Failed to load page ' + relativePage + ' (HTTP ' + response.status + ')');
-            }
-
-            // Read total pages from first response
-            var serverTotal = response.headers.get('X-DTL-Total-Pages');
-            if (serverTotal) {
-                var serverTotalNum = parseInt(serverTotal, 10);
-                var serverEnd = Math.min(chapterEnd, serverTotalNum);
-                var newChapterPages = serverEnd - chapterStart + 1;
-                if (newChapterPages !== totalChapterPages) {
-                    totalChapterPages = newChapterPages;
-                    document.getElementById('page-indicator').textContent = '/ ' + totalChapterPages;
-                    document.getElementById('page-input').max = totalChapterPages;
-                }
-            }
-
-            var arrayBuffer = await response.arrayBuffer();
-            return new Uint8Array(arrayBuffer);
-        }
-
-        async function renderPageToCanvas(relativePage, canvas) {
-            var pdfBytes = await fetchPagePdf(relativePage);
-            var loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
-            var pdfDoc = await loadingTask.promise;
-            var page = await pdfDoc.getPage(1); // Always page 1 of single-page PDF
-
-            // Get page dimensions
-            var viewport = page.getViewport({ scale: 1 });
-
-            // Store dimensions from first page
-            if (!pageDimensions) {
-                pageDimensions = { width: viewport.width, height: viewport.height };
-                pageWidth = viewport.width;
-                pageHeight = viewport.height;
-                // Resize all placeholders now that we know real dimensions
-                resizeAllPlaceholders();
-            }
-
-            // Calculate render scale
-            numericScale = calculateScale();
-            var scaledViewport = page.getViewport({ scale: numericScale });
-
-            // Set canvas size
-            var pixelRatio = window.devicePixelRatio || 1;
-            canvas.width = Math.floor(scaledViewport.width * pixelRatio);
-            canvas.height = Math.floor(scaledViewport.height * pixelRatio);
-            canvas.style.width = Math.floor(scaledViewport.width) + 'px';
-            canvas.style.height = Math.floor(scaledViewport.height) + 'px';
-
-            // Resize wrapper
-            var wrapper = canvas.parentElement;
-            wrapper.style.width = Math.floor(scaledViewport.width) + 'px';
-            wrapper.style.height = Math.floor(scaledViewport.height) + 'px';
-
-            // Render
-            var ctx = canvas.getContext('2d');
-            ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-
-            await page.render({
-                canvasContext: ctx,
-                viewport: scaledViewport
-            }).promise;
-
-            // Store reference for cleanup
-            pageStates[relativePage] = pageStates[relativePage] || {};
-            pageStates[relativePage].pdfDoc = pdfDoc;
-            pageStates[relativePage].state = 'rendered';
-
-            return pdfDoc;
-        }
-
-        // =============================================================
-        // PAGE CONTAINER MANAGEMENT
-        // =============================================================
-        function createPagePlaceholder(relativePage) {
-            var wrapper = document.createElement('div');
-            wrapper.className = 'page-wrapper';
-            wrapper.id = 'page-' + relativePage;
-            wrapper.setAttribute('data-page', relativePage);
-
-            // Default size until we know real dimensions
-            var scale = calculateScale();
-            var w = Math.floor(pageWidth * scale);
-            var h = Math.floor(pageHeight * scale);
-            wrapper.style.width = w + 'px';
-            wrapper.style.height = h + 'px';
-
-            var canvas = document.createElement('canvas');
-            wrapper.appendChild(canvas);
-
-            var loading = document.createElement('div');
-            loading.className = 'page-loading';
-            loading.innerHTML = '<div class="spinner"></div>';
-            wrapper.appendChild(loading);
-
-            pageStates[relativePage] = { state: 'empty', pdfDoc: null, canvas: canvas };
-
-            return wrapper;
-        }
-
-        function resizeAllPlaceholders() {
-            var scale = calculateScale();
-            numericScale = scale;
-            var w = Math.floor(pageDimensions.width * scale);
-            var h = Math.floor(pageDimensions.height * scale);
-
-            for (var i = 1; i <= totalChapterPages; i++) {
-                var wrapper = document.getElementById('page-' + i);
-                if (wrapper && pageStates[i] && pageStates[i].state !== 'rendered') {
-                    wrapper.style.width = w + 'px';
-                    wrapper.style.height = h + 'px';
-                }
-            }
-        }
-
-        async function loadPage(relativePage) {
-            if (relativePage < 1 || relativePage > totalChapterPages) return;
-            
-            var state = pageStates[relativePage];
-            if (!state || state.state === 'loading' || state.state === 'rendered') return;
-
-            state.state = 'loading';
-
-            var wrapper = document.getElementById('page-' + relativePage);
-            if (!wrapper) return;
-
-            var canvas = wrapper.querySelector('canvas');
-            var loadingEl = wrapper.querySelector('.page-loading');
-
-            try {
-                await renderPageToCanvas(relativePage, canvas);
-                if (loadingEl) loadingEl.remove();
-            } catch (e) {
-                console.error('Failed to load page ' + relativePage + ':', e);
-                state.state = 'error';
-                if (loadingEl) {
-                    loadingEl.className = 'page-error';
-                    loadingEl.textContent = 'Failed to load page. Scroll away and back to retry.';
-                }
-            }
-        }
-
-        function unloadPage(relativePage) {
-            var state = pageStates[relativePage];
-            if (!state || state.state !== 'rendered') return;
-
-            // Destroy PDF document to free memory
-            if (state.pdfDoc) {
-                state.pdfDoc.destroy();
-                state.pdfDoc = null;
-            }
-
-            // Clear canvas
-            var wrapper = document.getElementById('page-' + relativePage);
-            if (wrapper) {
-                var canvas = wrapper.querySelector('canvas');
-                if (canvas) {
-                    var ctx = canvas.getContext('2d');
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    canvas.width = 0;
-                    canvas.height = 0;
-                }
-
-                // Re-add loading placeholder
-                var existing = wrapper.querySelector('.page-loading');
-                if (!existing) {
-                    var loading = document.createElement('div');
-                    loading.className = 'page-loading';
-                    loading.innerHTML = '<div class="spinner"></div>';
-                    wrapper.appendChild(loading);
-                }
-
-                // Reset wrapper size to placeholder
-                var scale = calculateScale();
-                wrapper.style.width = Math.floor(pageDimensions.width * scale) + 'px';
-                wrapper.style.height = Math.floor(pageDimensions.height * scale) + 'px';
-            }
-
-            state.state = 'empty';
-        }
-
-        // =============================================================
-        // SCROLL & LAZY LOADING
-        // =============================================================
-        var observer = null;
-        var visiblePages = new Set();
-
-        function setupIntersectionObserver() {
-            observer = new IntersectionObserver(function(entries) {
-                entries.forEach(function(entry) {
-                    var pageNum = parseInt(entry.target.getAttribute('data-page'), 10);
-                    
-                    if (entry.isIntersecting) {
-                        visiblePages.add(pageNum);
-                        loadPage(pageNum);
-
-                        // Prefetch nearby pages
-                        for (var i = 1; i <= PREFETCH_AHEAD; i++) {
-                            loadPage(pageNum + i);
-                        }
-                        for (var i = 1; i <= PREFETCH_BEHIND; i++) {
-                            loadPage(pageNum - i);
-                        }
-                    } else {
-                        visiblePages.delete(pageNum);
-                    }
-                });
-
-                // Update current page to the lowest visible page
-                if (visiblePages.size > 0) {
-                    var lowest = Math.min.apply(null, Array.from(visiblePages));
-                    if (lowest !== currentPage) {
-                        currentPage = lowest;
-                        updatePageUI();
-                    }
-                }
-
-                // Memory management: unload far-away pages
-                cleanupDistantPages();
-
-            }, {
-                root: viewerContainer,
-                rootMargin: '200% 0px' // Start loading well before pages come into view
-            });
-
-            // Observe all page wrappers
-            for (var i = 1; i <= totalChapterPages; i++) {
-                var wrapper = document.getElementById('page-' + i);
-                if (wrapper) observer.observe(wrapper);
-            }
-        }
-
-        function cleanupDistantPages() {
-            var center = currentPage;
-            var keepRange = MAX_RENDERED;
-
-            for (var page in pageStates) {
-                var p = parseInt(page, 10);
-                if (Math.abs(p - center) > keepRange) {
-                    unloadPage(p);
-                }
-            }
-        }
-
-        // =============================================================
-        // NAVIGATION
-        // =============================================================
-        function goToPage(relativePage) {
-            if (relativePage < 1) relativePage = 1;
-            if (relativePage > totalChapterPages) relativePage = totalChapterPages;
-
-            currentPage = relativePage;
-            updatePageUI();
-
-            var wrapper = document.getElementById('page-' + relativePage);
-            if (wrapper) {
-                wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        }
-
-        function updatePageUI() {
-            var pageInput = document.getElementById('page-input');
-            if (document.activeElement !== pageInput) {
-                pageInput.value = currentPage;
-            }
-
-            // Update prev/next button states
-            document.getElementById('btn-prev').disabled = (currentPage <= 1);
-            document.getElementById('btn-next').disabled = (currentPage >= totalChapterPages);
-        }
-
-        // =============================================================
-        // RE-RENDER ON ZOOM
-        // =============================================================
-        async function rerenderAllPages() {
-            numericScale = calculateScale();
-
-            for (var i = 1; i <= totalChapterPages; i++) {
-                var wrapper = document.getElementById('page-' + i);
-                if (!wrapper) continue;
-
-                var state = pageStates[i];
-
-                if (state && state.state === 'rendered') {
-                    // Re-render this page at new scale
-                    state.state = 'empty'; // Mark for reload
-                    
-                    // Destroy old PDF doc
-                    if (state.pdfDoc) {
-                        state.pdfDoc.destroy();
-                        state.pdfDoc = null;
-                    }
-                }
-
-                // Resize placeholder
-                if (pageDimensions) {
-                    var scale = calculateScale();
-                    var w = Math.floor(pageDimensions.width * scale);
-                    var h = Math.floor(pageDimensions.height * scale);
-                    wrapper.style.width = w + 'px';
-                    wrapper.style.height = h + 'px';
-                }
-            }
-
-            // Re-trigger loading for visible pages
-            visiblePages.forEach(function(pageNum) {
-                loadPage(pageNum);
-                for (var j = 1; j <= PREFETCH_AHEAD; j++) loadPage(pageNum + j);
-            });
-        }
-
-        // Handle window resize
-        var resizeTimeout = null;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(function() {
-                if (currentScale === 'fit-width' || currentScale === 'fit-page') {
-                    rerenderAllPages();
-                }
-            }, 200);
-        });
-
-        // =============================================================
-        // INITIALIZATION
-        // =============================================================
-        async function initializeViewer() {
-            setupUI();
-
-            // Create page placeholders
-            for (var i = 1; i <= totalChapterPages; i++) {
-                var placeholder = createPagePlaceholder(i);
-                viewerContainer.appendChild(placeholder);
-            }
-
-            // Add end-of-chapter card
-            var endCard = document.createElement('div');
-            endCard.className = 'chapter-boundary-card';
-            endCard.innerHTML =
-                '<div class="card-icon">📖</div>' +
-                '<h2>End of ' + (chapterName ? '"' + chapterName + '"' : 'Chapter') + '</h2>' +
-                '<p>You\'ve reached the end of this section. Browse our catalogs for more resources:</p>' +
-                '<div class="catalog-links">' +
-                    '<a href="https://libguides.thedtl.org/home" class="catalog-link catalog-link-dtl">📖 DTL Catalog</a>' +
-                    '<a href="https://dtl2.libguides.com/home" class="catalog-link catalog-link-dtl2">📚 DTL2 Catalog</a>' +
-                '</div>';
-            viewerContainer.appendChild(endCard);
-
-            // Setup lazy loading
-            setupIntersectionObserver();
-
-            // Load first page
-            await loadPage(1);
-
-            // Hide loading overlay
-            var overlay = document.getElementById('loading-overlay');
-            if (overlay) overlay.style.display = 'none';
-
-            updatePageUI();
-            isInitialized = true;
         }
 
         // =============================================================
@@ -1186,6 +1093,7 @@
         } else {
             showGestureGate();
         }
+
     })();
     </script>
 </body>
