@@ -665,6 +665,7 @@
         var pageSlots = [];           // page-slot DOM elements
         var pageCache = {};           // pageNumber -> { bytes, rendered, width, height }
         var pageFetching = {};        // pageNumber -> true
+        var pageRendering = {};       // pageNumber -> true (render lock)
         var currentVisiblePage = CONFIG.start;
         var serverTotalPages = null;
         var viewerInitialized = false;
@@ -733,6 +734,9 @@
             var cached = pageCache[pageNum];
             if (!cached) return Promise.resolve();
 
+            // Skip if already rendering
+            if (pageRendering[pageNum]) return Promise.resolve();
+
             var slotIndex = pageNum - CONFIG.start;
             if (slotIndex < 0 || slotIndex >= pageSlots.length) return Promise.resolve();
             var slot = pageSlots[slotIndex];
@@ -740,6 +744,8 @@
 
             // Skip if already rendered at current zoom
             if (cached.rendered && cached.renderedZoom === displayScale) return Promise.resolve();
+
+            pageRendering[pageNum] = true;
 
             return pdfjsLib.getDocument({ data: cached.bytes.slice() }).promise
                 .then(function(pdf) {
@@ -757,16 +763,16 @@
                         if (!baseWidth) baseWidth = natVp.width;
                     }
 
-                    // Get or create canvas
-                    var canvas = slot.querySelector('canvas');
-                    if (!canvas) {
-                        canvas = document.createElement('canvas');
-                        var loading = slot.querySelector('.page-loading');
-                        if (loading) loading.remove();
-                        var error = slot.querySelector('.page-error');
-                        if (error) error.remove();
-                        slot.appendChild(canvas);
-                    }
+                    // Always create a fresh canvas to avoid concurrent render conflicts
+                    var oldCanvas = slot.querySelector('canvas');
+                    if (oldCanvas) oldCanvas.remove();
+                    var loading = slot.querySelector('.page-loading');
+                    if (loading) loading.remove();
+                    var error = slot.querySelector('.page-error');
+                    if (error) error.remove();
+
+                    var canvas = document.createElement('canvas');
+                    slot.appendChild(canvas);
 
                     canvas.width = viewport.width;
                     canvas.height = viewport.height;
@@ -781,9 +787,11 @@
                 .then(function() {
                     cached.rendered = true;
                     cached.renderedZoom = displayScale;
+                    pageRendering[pageNum] = false;
                 })
                 .catch(function(err) {
                     console.error('[DTL] Render page ' + pageNum + ' error:', err);
+                    pageRendering[pageNum] = false;
                     showPageError(pageNum);
                 });
         }
@@ -817,6 +825,7 @@
                 slot.appendChild(loadDiv);
                 delete pageCache[pageNum];
                 delete pageFetching[pageNum];
+                delete pageRendering[pageNum];
                 fetchAndRenderPage(pageNum);
             });
         }
@@ -826,6 +835,7 @@
         // =============================================================
         function fetchAndRenderPage(pageNum) {
             if (pageNum < CONFIG.start || pageNum > CONFIG.end) return Promise.resolve();
+            if (pageRendering[pageNum]) return Promise.resolve();
             if (pageCache[pageNum] && pageCache[pageNum].rendered && pageCache[pageNum].renderedZoom === displayScale) return Promise.resolve();
 
             return fetchPage(pageNum)
@@ -983,6 +993,7 @@
                 var pn = parseInt(keys[i]);
                 if (pageCache[pn] && pageCache[pn].bytes) {
                     pageCache[pn].rendered = false;
+                    pageRendering[pn] = false; // Clear lock so re-render can proceed
                     renderPage(pn);
                 }
             }
@@ -1061,27 +1072,24 @@
 
             createPageSlots();
             updateToolbar();
-            setupObserver();
 
-            // Fetch first page to get server metadata, then auto-fit
-            fetchAndRenderPage(CONFIG.start).then(function() {
+            // Fetch first page to get server metadata and dimensions,
+            // then start the observer to load remaining pages.
+            fetchPage(CONFIG.start).then(function() {
                 // Server may have adjusted CONFIG.end
                 var currentSlots = pageSlots.length;
                 var expectedSlots = CONFIG.end - CONFIG.start + 1;
                 if (expectedSlots !== currentSlots) {
                     createPageSlots();
-                    setupObserver();
                 }
                 updateToolbar();
 
-                // Auto fit-to-width
-                if (baseWidth) {
-                    var w = containerEl.clientWidth - 48;
-                    var fit = Math.round((w / baseWidth) * 20) / 20;
-                    fit = Math.max(0.5, Math.min(3.0, fit));
-                    displayScale = fit;
-                    reRenderAllVisible();
-                }
+                // Render first page
+                return renderPage(CONFIG.start);
+            }).then(function() {
+                updateToolbar();
+                // Start observer to load remaining pages as user scrolls
+                setupObserver();
             });
         }
 
